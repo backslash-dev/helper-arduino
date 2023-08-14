@@ -14,14 +14,18 @@ const int peizoPin = 16;
 const int emergencyButtonPin = 14;
 const int pulseSensorPurplePin = A0;
 
+// 위급 상황 감지 변수
+unsigned long lastHeartbeatTime = 0;
+unsigned long lastEmergencyButtonPressTime = 0;
 
 int Signal;
 
 
 // Fall detection threshold
 const int Threshold = 550;
-int heartRate = 80;
+int heartRate = 15;
 int heartDownCount = 0;
+int buttonWatingCount = 0;
 bool imageCapture = false;
 String response;
 
@@ -137,31 +141,39 @@ void detectFall(const char* deviceId, int heartRate, bool imageCapture, String& 
 }
 
 void loop() {
-  
-  // 심박수 이상 감지
-  if(heartDownCount > 60){
-    detectFall(deviceId, heartRate, imageCapture, response);
-    Serial.println("Fall Detection Response: " + response);
-    heartDownCount = 0;
-  }
+  unsigned long currentTime = millis();  // 현재 시간을 밀리초 단위로 가져옴
 
-  // 심박수 계산
+  // 심박수 감지
   Signal = analogRead(pulseSensorPurplePin);
 
-  // 심박수 감지 됨
   if (Signal > Threshold) {
-    Serial.print("");
+    lastHeartbeatTime = currentTime;  // 심박수가 감지될 때마다 시간 갱신
   } else {
-    Serial.print("");
+    // 1분 동안 심박수가 감지되지 않을 때 
+    if (currentTime - lastHeartbeatTime >= 60000) {
+
+      // 부저 울림
+      if (currentTime % 2000 < 1000) {
+        digitalWrite(peizoPin, HIGH);
+      } else {
+        digitalWrite(peizoPin, LOW);
+      }
+        
+      // 버튼 체크
+      int buttonState = digitalRead(emergencyButtonPin);
+
+      if (buttonState == LOW) {
+        lastEmergencyButtonPressTime = currentTime; // 버튼이 눌린 시간 기록
+      }
+
+      // 버튼 안누른 지 20초가 지나면
+      if (buttonState == HIGH && currentTime - lastEmergencyButtonPressTime >= 20000) {
+        // 서버 전송
+        detectFall(deviceId, heartRate, imageCapture, response);
+        Serial.println("Fall Detection Response: " + response);        
+      }
+    }
   }
 
-  // 위급 상황 해결 버튼 클릭됨
-  if (digitalRead(emergencyButtonPin) == LOW) {
-    Serial.print("");
-  } else {
-    Serial.print("");
-  }
-
-  // digitalWrite(peizoPin, HIGH); 피에조 부저 울리게 하기
-  // digitalWrite(peizoPin, LOW); 피에조 부저 멈추게 하기 
+  delay(10);
 }
