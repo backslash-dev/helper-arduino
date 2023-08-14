@@ -6,6 +6,7 @@
 #ifndef STASSID
 #define STASSID "이재민의 iPhone"
 #define STAPSK "1234qwer"
+
 #define SERVER_IP "127.0.0.1:3000"
 #endif
 
@@ -63,35 +64,27 @@ void setup() {
   client.setInsecure();
 }
 
-void loop() {
-  sendHttpPostRequest(); // Call the function to send HTTP POST request
-}
-
-void sendHttpPostRequest() {
-  // wait for WiFi connection
-  if ((WiFi.status() == WL_CONNECTED)) {
-
+void sendHttpPostRequest(const char* path, const char* requestBody, String& responseMessage) {
+  if (WiFi.status() == WL_CONNECTED) {
     WiFiClient client;
     HTTPClient http;
 
     Serial.print("[HTTP] begin...\n");
-    // configure traged server and url
-    http.begin(client, "http://" SERVER_IP "/register/");  // HTTP
+    String url = "http://" + String(SERVER_IP) + String(path);
+    http.begin(client, url);
+
     http.addHeader("Content-Type", "application/json");
 
     Serial.print("[HTTP] POST...\n");
-    // start connection and send HTTP header and body
-    int httpCode = http.POST(" {\"deviceId\": \"your_device_id\"}");
+    int httpCode = http.POST(requestBody);
 
-    // httpCode will be negative on error
     if (httpCode > 0) {
-      // HTTP header has been send and Server response header has been handled
       Serial.printf("[HTTP] POST... code: %d\n", httpCode);
 
-      // file found at server
       if (httpCode == HTTP_CODE_OK) {
-        const String& payload = http.getString();
-        Serial.println("received payload:\n<<");
+        String payload = http.getString();
+        responseMessage = payload;
+        Serial.println("Received payload:\n<<");
         Serial.println(payload);
         Serial.println(">>");
       }
@@ -101,6 +94,40 @@ void sendHttpPostRequest() {
 
     http.end();
   }
+}
 
+void registerDevice(const char* deviceId, String& responseMessage) {
+  const char* path = "/register/";
+  String requestBody = "{\"deviceId\": \"" + String(deviceId) + "\"}";
+  sendHttpPostRequest(path, requestBody.c_str(), responseMessage);
+}
+
+void detectFall(const char* deviceId, int heartRate, bool imageCapture, String& responseMessage) {
+  const char* path = "/fall-detection/";
+  String requestBody = "{\"deviceId\": \"" + String(deviceId) + "\","
+                      "\"heartRate\": " + String(heartRate) + ","
+                      "\"imageCapture\": " + String(imageCapture ? "true" : "false") + "}";
+  sendHttpPostRequest(path, requestBody.c_str(), responseMessage);
+}
+
+
+
+void loop() {
+  // Example usage
+  String response;
+
+  // Register Device
+  const char* deviceId = "your_device_id";
+  registerDevice(deviceId, response);
+  Serial.println("Device Registration Response: " + response);
+
+  // Detect Fall
+  int heartRate = 15;
+  bool imageCapture = false;
+  detectFall(deviceId, heartRate, imageCapture, response);
+  Serial.println("Fall Detection Response: " + response);
+
+  // Other loop code
   delay(10000);
 }
+
