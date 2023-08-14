@@ -6,7 +6,7 @@
 // Wi-Fi and server configuration
 #define WIFI_SSID "이재민의 iPhone"
 #define WIFI_PASS "1234qwer"
-#define SERVER_IP "127.0.0.1:3000"
+#define SERVER_IP "43.201.83.172:3000"
 
 // Pins
 const int ledPin = 2;
@@ -14,8 +14,15 @@ const int peizoPin = 16;
 const int emergencyButtonPin = 14;
 const int pulseSensorPurplePin = A0;
 
+
 // Fall detection threshold
 const int Threshold = 550;
+int heartRate = 80;
+int heartDownCount = 0;
+bool imageCapture = false;
+String response;
+
+const char* deviceId = "arduino";
 
 // Function prototypes
 void setupWiFi();
@@ -37,6 +44,10 @@ void setup() {
   // Set up client for insecure connections (not recommended for production)
   WiFiClientSecure client;
   client.setInsecure();
+
+  // // Register Device
+  // registerDevice(deviceId, response);
+  // Serial.println("Device Registration Response: " + response);
 }
 
 void setupWiFi() {
@@ -123,18 +134,22 @@ void detectFall(const char* deviceId, int heartRate, bool imageCapture, String& 
 }
 
 void loop() {
-  String response;
+  
+  // 심박수 이상 감지
+  if(heartDownCount > 60){
+    detectFall(deviceId, heartRate, imageCapture, response);
+    Serial.println("Fall Detection Response: " + response);
+    heartDownCount = 0;
+  }
 
-  // Register Device
-  const char* deviceId = "your_device_id";
-  registerDevice(deviceId, response);
-  Serial.println("Device Registration Response: " + response);
+  // 심박수 계산
+  Signal = analogRead(PulseSensorPurplePin);
 
-  // Detect Fall
-  int heartRate = 15;
-  bool imageCapture = false;
-  detectFall(deviceId, heartRate, imageCapture, response);
-  Serial.println("Fall Detection Response: " + response);
+  if (Signal > Threshold) {
+    pulseDetected = true;
+  } else {
+    pulseDetected = false;
+  }
 
-  delay(10000); // Wait before repeating the loop
+  
 }
