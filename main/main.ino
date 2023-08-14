@@ -145,12 +145,15 @@ void loop() {
 
   // 심박수 감지
   Signal = analogRead(pulseSensorPurplePin);
-
+  Signal = 200; // 시연용 코드
   if (Signal > Threshold) {
     lastHeartbeatTime = currentTime;  // 심박수가 감지될 때마다 시간 갱신
+    lastEmergencyButtonPressTime = currentTime;
   } else {
     // 1분 동안 심박수가 감지되지 않을 때 
-    if (currentTime - lastHeartbeatTime >= 60000) {
+    // 시연용으로 20초로 변경
+    if (currentTime - lastHeartbeatTime >= 20000) {
+      
 
       // 부저 울림
       if (currentTime % 2000 < 1000) {
@@ -163,14 +166,20 @@ void loop() {
       int buttonState = digitalRead(emergencyButtonPin);
 
       if (buttonState == LOW) {
-        lastEmergencyButtonPressTime = currentTime; // 버튼이 눌린 시간 기록
+        lastHeartbeatTime = currentTime;  
+        lastEmergencyButtonPressTime = currentTime; 
+        digitalWrite(peizoPin, LOW);
       }
 
       // 버튼 안누른 지 20초가 지나면
-      if (buttonState == HIGH && currentTime - lastEmergencyButtonPressTime >= 20000) {
+      if (buttonState == HIGH && currentTime - lastEmergencyButtonPressTime >= 40000) {
         // 서버 전송
         detectFall(deviceId, heartRate, imageCapture, response);
         Serial.println("Fall Detection Response: " + response);        
+
+        lastHeartbeatTime = currentTime;  
+        lastEmergencyButtonPressTime = currentTime; 
+        digitalWrite(peizoPin, LOW);
       }
     }
   }
