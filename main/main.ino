@@ -1,49 +1,51 @@
 #include <ESP8266WiFi.h>
 #include <WiFiClientSecure.h>
-#include "certs.h"
+#include <ArduinoJson.h>
+#include <ESP8266HTTPClient.h> // Include the HTTPClient library
 
 #ifndef STASSID
 #define STASSID "이재민의 iPhone"
 #define STAPSK "1234qwer"
+#define SERVER_IP "127.0.0.1:3000"
 #endif
+
+WiFiClientSecure client;
 
 const char* ssid = STASSID;
 const char* password = STAPSK;
 
-X509List cert(cert_DigiCert_Global_Root_CA);
+int pulseSensorPurplePin = A0;
+int signal;
+int ledPin = 2;
+int peizoPin = 16;
+int emergencyButtonPin = 14;
 
-int pulseSensorPurplePin = A0; // 심박센서 핀
-int signal; // 실제 감지되는 심박수 값
-int ledPin = 2; // 보드 LED 핀
-int peizoPin = 16; //페이조 부저 + 핀
-int emergencyButtonPin = 14; //위급상황 버튼 핀
- 
-int Threshold = 550; // 심박수 임계값
- 
- 
+int Threshold = 550;
+
 void setup() {
   pinMode(ledPin, OUTPUT);
-  pinMode(peizoPin, OUTPUT); 
+  pinMode(peizoPin, OUTPUT);
   pinMode(emergencyButtonPin, INPUT_PULLUP);
 
   Serial.begin(115200);
+
   Serial.println();
   Serial.print("Connecting to ");
   Serial.println(ssid);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
+
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
+
   Serial.println("");
   Serial.println("WiFi connected");
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
 
-  // Set time via NTP, as required for x.509 validation
   configTime(3 * 3600, 0, "pool.ntp.org", "time.nist.gov");
-
   Serial.print("Waiting for NTP time sync: ");
   time_t now = time(nullptr);
 
@@ -58,56 +60,47 @@ void setup() {
   Serial.print("Current time: ");
   Serial.print(asctime(&timeinfo));
 
-  // Use WiFiClientSecure class to create TLS connection
-  WiFiClientSecure client;
-  Serial.print("Connecting to ");
-  Serial.println(github_host);
-
-  Serial.printf("Using certificate: %s\n", cert_DigiCert_Global_Root_CA);
-  client.setTrustAnchors(&cert);
-
-  if (!client.connect(github_host, github_port)) {
-    Serial.println("Connection failed");
-    return;
-  }
-
-  String url = "/repos/esp8266/Arduino/commits/master/status";
-  Serial.print("Requesting URL: ");
-  Serial.println(url);
-
-  client.print(String("GET ") + url + " HTTP/1.1\r\n" + "Host: " + github_host + "\r\n" + "User-Agent: BuildFailureDetectorESP8266\r\n" + "Connection: close\r\n\r\n");
-
-  Serial.println("Request sent");
-  while (client.available()) {
-    String line = client.readStringUntil('\n');
-    if (line == "\r") {
-      Serial.println("Headers received");
-      break;
-    }
-  }
-  String line = client.readStringUntil('\n');
-  if (line.startsWith("{\"state\":\"success\"")) {
-    Serial.println("esp8266/Arduino CI successful!");
-  } else {
-    Serial.println("esp8266/Arduino CI has failed");
-  }
-  Serial.println("Reply was:");
-  Serial.println("==========");
-  Serial.println(line);
-  Serial.println("==========");
-  Serial.println("Closing connection");
+  client.setInsecure();
 }
- 
+
 void loop() {
-  signal = analogRead(pulseSensorPurplePin);
-  // Serial.println(signal);
+  sendHttpPostRequest(); // Call the function to send HTTP POST request
+}
 
-  if (digitalRead(emergencyButtonPin) == LOW) {
-    digitalWrite(peizoPin, HIGH);
-  } else {
-    digitalWrite(peizoPin, LOW);
+void sendHttpPostRequest() {
+  // wait for WiFi connection
+  if ((WiFi.status() == WL_CONNECTED)) {
+
+    WiFiClient client;
+    HTTPClient http;
+
+    Serial.print("[HTTP] begin...\n");
+    // configure traged server and url
+    http.begin(client, "http://" SERVER_IP "/register/");  // HTTP
+    http.addHeader("Content-Type", "application/json");
+
+    Serial.print("[HTTP] POST...\n");
+    // start connection and send HTTP header and body
+    int httpCode = http.POST(" {\"deviceId\": \"your_device_id\"}");
+
+    // httpCode will be negative on error
+    if (httpCode > 0) {
+      // HTTP header has been send and Server response header has been handled
+      Serial.printf("[HTTP] POST... code: %d\n", httpCode);
+
+      // file found at server
+      if (httpCode == HTTP_CODE_OK) {
+        const String& payload = http.getString();
+        Serial.println("received payload:\n<<");
+        Serial.println(payload);
+        Serial.println(">>");
+      }
+    } else {
+      Serial.printf("[HTTP] POST... failed, error: %s\n", http.errorToString(httpCode).c_str());
+    }
+
+    http.end();
   }
-  delay(10);
 
-
+  delay(10000);
 }
