@@ -15,6 +15,9 @@ const int emergencyButtonPin = 14;
 const int pulseSensorPurplePin = A0;
 
 
+int Signal;
+
+
 // Fall detection threshold
 const int Threshold = 550;
 int heartRate = 80;
@@ -143,13 +146,22 @@ void loop() {
   }
 
   // 심박수 계산
-  Signal = analogRead(PulseSensorPurplePin);
+  Signal = analogRead(pulseSensorPurplePin);
 
+  // 심박수 감지 됨
   if (Signal > Threshold) {
-    pulseDetected = true;
+    Serial.print("");
   } else {
-    pulseDetected = false;
+    Serial.print("");
   }
 
-  
+  // 위급 상황 해결 버튼 클릭됨
+  if (digitalRead(emergencyButtonPin) == LOW) {
+    Serial.print("");
+  } else {
+    Serial.print("");
+  }
+
+  // digitalWrite(peizoPin, HIGH); 피에조 부저 울리게 하기
+  // digitalWrite(peizoPin, LOW); 피에조 부저 멈추게 하기 
 }
